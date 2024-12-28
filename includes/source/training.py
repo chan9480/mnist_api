@@ -8,16 +8,20 @@ from torch import nn
 from sklearn.model_selection import train_test_split
 from includes.source.model import CNN  # CNN 모델 import
 
-
 class Trainer:
-    def __init__(self, learning_rate, batch_size, epochs, run_name=None, experiment_name=None, val_split=0.2):
+    def __init__(self, learning_rate, batch_size, epochs, run_name=None, experiment_name=None, val_split=0.2,
+                 loss_function_str="CrossEntropyLoss", optimizer_type_str="Adam"):
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.epochs = epochs
         self.run_name = run_name
-        self.val_split = val_split  # 검증 데이터 비율
-        self.experiment_name = experiment_name  # 실험 이름
+        self.val_split = val_split
+        self.experiment_name = experiment_name
 
+        # 옵티마이저와 손실 함수의 문자열을 받아서 적절한 객체로 설정
+        self.loss_function_str = loss_function_str
+        self.optimizer_type_str = optimizer_type_str
+        
         self.transform = transforms.Compose([
             transforms.Grayscale(num_output_channels=1),
             transforms.ToTensor(),
@@ -26,17 +30,46 @@ class Trainer:
 
     def _get_experiment_id(self):
         """주어진 experiment_name으로 experiment_id를 반환하고, 없으면 생성"""
-        # experiment_name이 주어지면 해당 이름의 실험을 찾고, 없으면 새로 생성
         experiment = mlflow.get_experiment_by_name(self.experiment_name)
 
         if experiment is None:
-            # 실험이 존재하지 않으면 새로 생성
             experiment_id = mlflow.create_experiment(self.experiment_name)
         else:
-            # 실험이 존재하면 그 ID를 반환
             experiment_id = experiment.experiment_id
         
         return experiment_id
+
+    def get_loss_function(self):
+        """손실 함수 문자열에 따라 손실 함수 객체 반환"""
+        if self.loss_function_str == "CrossEntropyLoss":
+            return nn.CrossEntropyLoss()
+        elif self.loss_function_str == "MSELoss":
+            return nn.MSELoss()
+        elif self.loss_function_str == "BCEWithLogitsLoss":
+            return nn.BCEWithLogitsLoss()
+        elif self.loss_function_str == "SmoothL1Loss":
+            return nn.SmoothL1Loss()
+        elif self.loss_function_str == "L1Loss":
+            return nn.L1Loss()
+        else:
+            raise ValueError(f"지원되지 않는 손실 함수: {self.loss_function_str}")
+
+    def get_optimizer(self, model):
+        """옵티마이저 문자열에 따라 옵티마이저 객체 반환"""
+        if self.optimizer_type_str == "Adam":
+            return optim.Adam(model.parameters(), lr=self.learning_rate)
+        elif self.optimizer_type_str == "AdamW":
+            return optim.AdamW(model.parameters(), lr=self.learning_rate)
+        elif self.optimizer_type_str == "SGD":
+            return optim.SGD(model.parameters(), lr=self.learning_rate, momentum=0.9)
+        elif self.optimizer_type_str == "RMSprop":
+            return optim.RMSprop(model.parameters(), lr=self.learning_rate)
+        elif self.optimizer_type_str == "Adagrad":
+            return optim.Adagrad(model.parameters(), lr=self.learning_rate)
+        elif self.optimizer_type_str == "Adadelta":
+            return optim.Adadelta(model.parameters(), lr=self.learning_rate)
+        else:
+            raise ValueError(f"지원되지 않는 옵티마이저: {self.optimizer_type_str}")
 
     def train_model(self):
         # 데이터 로드
@@ -51,17 +84,19 @@ class Trainer:
         val_loader = DataLoader(val_subset, batch_size=self.batch_size, shuffle=False)
 
         model = CNN()
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
 
-        # 실험 ID 얻기 (없으면 새로 생성)
+        # 손실 함수와 옵티마이저 설정
+        criterion = self.get_loss_function()
+        optimizer = self.get_optimizer(model)
+
         experiment_id = self._get_experiment_id()
 
-        # MLflow 실험 시작 (experiment_id가 주어지면 해당 실험에서 실행)
         with mlflow.start_run(run_name=self.run_name, experiment_id=experiment_id):
             mlflow.log_param("learning_rate", self.learning_rate)
             mlflow.log_param("batch_size", self.batch_size)
             mlflow.log_param("epochs", self.epochs)
+            mlflow.log_param("loss_function", self.loss_function_str)
+            mlflow.log_param("optimizer", self.optimizer_type_str)
 
             for epoch in range(self.epochs):
                 model.train()
@@ -111,4 +146,15 @@ class Trainer:
             mlflow.pytorch.log_model(model, "model")
             mlflow.log_artifact(model_path)
 
-        return model_path
+        # 최종 epoch 및 훈련/검증 결과 반환
+        return {
+            "model_path": model_path,
+            "final_epoch": self.epochs,
+            "train_loss": running_loss / len(train_loader),
+            "val_loss": val_loss / len(val_loader),
+            "val_accuracy": 100 * val_correct / val_total,
+            "learning_rate": self.learning_rate,
+            "batch_size": self.batch_size,
+            "loss_function": self.loss_function_str,
+            "optimizer": self.optimizer_type_str
+        }

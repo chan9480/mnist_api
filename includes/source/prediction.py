@@ -16,11 +16,9 @@ class Predictor:
     def load_model(self):
         # MLflow에서 가장 최근 버전의 ONNX 모델을 불러오기
         model_uri = f"models:/{self.model_name}/latest"
-        # print(model_uri)
         
         # ONNX 모델 파일 경로 얻기
         local_model_path = mlflow.artifacts.download_artifacts(artifact_uri=model_uri, dst_path='includes/models/onnx')
-        # print(local_model_path)
         onnx_model_path = f"{local_model_path}/onnx_model.onnx"
         
         # ONNX 모델 로드
@@ -49,6 +47,14 @@ class Predictor:
         inputs = {ort_session.get_inputs()[0].name: img}
         output = ort_session.run(None, inputs)
 
+        # Convert logits to probabilities using softmax
+        logits = output[0]
+        softmax_output = np.exp(logits) / np.sum(np.exp(logits), axis=1, keepdims=True)
+        
         # 예측된 값
         predicted = np.argmax(output[0], axis=1)
-        return int(predicted[0])
+        
+        # Confidence score
+        confidence = np.max(softmax_output, axis=1)
+        
+        return int(predicted[0]), float(confidence[0])  # Returning both predicted class and confidence

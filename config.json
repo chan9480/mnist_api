@@ -1,9 +1,12 @@
 {
     "EXPERIMENT_NAME": "something_new",
     "RUN_NAME": "mnist_training_run",
-    "EPOCHS": 1,
-    "BATCH_SIZE": 8,
+    "EPOCHS": 3,
+    "BATCH_SIZE": 32,
     "LEARNING_RATE": 0.001,
     "IMAGE_PATH": "includes/data/test.png",
-    "REGISTER_NAME": "mnist_model_test"
+    "REGISTER_NAME": "mnist_model_test",
+    "VAL_SPLIT":0.2,
+    "LOSS_FUNCTION":"CrossEntropyLoss",
+    "OPTIMIZER_TYPE":"Adam"
   }

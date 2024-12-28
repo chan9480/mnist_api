@@ -53,7 +53,19 @@ class ModelRegistrar:
 
         mlflow.end_run()
 
-        return model_version
+        # 모델 구조를 문자열로 반환
+        model_structure = str(model)
+
+        # 반환할 모델 관련 정보들
+        model_info = {
+            "model_version": model_version,
+            "model_name": self.register_name,
+            "onnx_model_uri": onnx_model_uri,
+            "onnx_model_path": onnx_model_path,
+            "model_structure": model_structure  # 모델 구조 포함
+        }
+
+        return model_info
 
     def _convert_to_onnx(self, model, run_id):
         # 모델을 추론 모드로 설정
