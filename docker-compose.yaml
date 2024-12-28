@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  flask:
+    build: .
+    container_name: flask-api
+    ports:
+      - "5001:5000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+    volumes:
+      - ./:/app/
+    networks:
+      - mlflow-network
+    command: /bin/bash -c "flask run --host=0.0.0.0 --port=5000"
+    
+  mlflow-server:
+    image: ghcr.io/mlflow/mlflow:v2.3.0
+    container_name: mlflow-server
+    ports:
+      - "5002:5000"
+    volumes:
+      - ./:/mlflow
+    networks:
+      - mlflow-network
+    command: mlflow server --host 0.0.0.0
+
+networks:
+  mlflow-network:
+    driver: bridge

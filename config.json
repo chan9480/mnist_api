@@ -1,0 +1,9 @@
+{
+    "EXPERIMENT_NAME": "something_new",
+    "RUN_NAME": "mnist_training_run",
+    "EPOCHS": 1,
+    "BATCH_SIZE": 16,
+    "LEARNING_RATE": 0.001,
+    "IMAGE_PATH": "includes/data/test.png",
+    "REGISTER_NAME": "mnist_model_test"
+  }
