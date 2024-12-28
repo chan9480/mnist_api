@@ -1,6 +1,7 @@
 import torch
 import mlflow
 import mlflow.pytorch
+import numpy as np
 from io import BytesIO
 from PIL import Image
 import onnx
@@ -15,12 +16,12 @@ class Predictor:
     def load_model(self):
         # MLflow에서 가장 최근 버전의 ONNX 모델을 불러오기
         model_uri = f"models:/{self.model_name}/latest"
-        print(model_uri)
+        # print(model_uri)
         
         # ONNX 모델 파일 경로 얻기
-        local_model_path = mlflow.artifacts.download_artifacts(model_uri=model_uri)
-        print(local_model_path)
-        onnx_model_path = f"{local_model_path}/model.onnx"
+        local_model_path = mlflow.artifacts.download_artifacts(artifact_uri=model_uri, dst_path='includes/models/onnx')
+        # print(local_model_path)
+        onnx_model_path = f"{local_model_path}/onnx_model.onnx"
         
         # ONNX 모델 로드
         onnx_model = onnx.load(onnx_model_path)
@@ -31,7 +32,8 @@ class Predictor:
         return ort_session
 
     def predict_image(self, image_data):
-        model = self.load_model()
+        # Load the model
+        ort_session = self.load_model()
 
         # 이미지를 BytesIO로 열고, Grayscale로 변환
         img = Image.open(BytesIO(image_data)).convert('L')
@@ -41,9 +43,12 @@ class Predictor:
 
         # 이미지 변환
         img = transform(img).unsqueeze(0)  # 배치 차원 추가
+        img = img.numpy()  # Convert to numpy array for ONNX Runtime
 
-        # 모델 예측
-        with torch.no_grad():
-            output = model(img)
-            _, predicted = torch.max(output.data, 1)
-            return predicted.item()
+        # ONNX 모델 예측
+        inputs = {ort_session.get_inputs()[0].name: img}
+        output = ort_session.run(None, inputs)
+
+        # 예측된 값
+        predicted = np.argmax(output[0], axis=1)
+        return int(predicted[0])
